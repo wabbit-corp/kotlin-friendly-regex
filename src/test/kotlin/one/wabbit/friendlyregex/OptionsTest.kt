@@ -1,14 +1,18 @@
 package one.wabbit.friendlyregex
 
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import one.wabbit.friendlyregex.FriendlyRegex as FR
 
 class OptionsTest {
-
     @Test
     fun case_insensitive() {
-        val r = FR.compile("{start}{alpha}+@gmail.com{end}",
-            FR.defaultConfig.copy(caseInsensitive = true))
+        val r =
+            FR.compile(
+                "{start}{alpha}+@gmail.com{end}",
+                FR.defaultConfig.copy(caseInsensitive = true),
+            )
         assertTrue(r.matches("FOO_BAR@gmail.com"))
     }
 

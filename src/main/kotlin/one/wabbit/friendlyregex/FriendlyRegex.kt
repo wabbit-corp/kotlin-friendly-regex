@@ -1,39 +1,40 @@
 package one.wabbit.friendlyregex
 
-import kotlin.text.RegexOption.*
+import kotlin.text.RegexOption.DOT_MATCHES_ALL
+import kotlin.text.RegexOption.IGNORE_CASE
+import kotlin.text.RegexOption.MULTILINE
 
 /**
  * FriendlyRegex — a human-first pattern language that compiles to Kotlin Regex.
  *
  * Core ideas:
- *  - Tokens like {digit}, {alpha}, {email}, {delim-ws}, {start}/{end}
- *  - Shorthands: # -> digit, % -> any (configurable)
- *  - Wrangle-style classes: {[abc]} and {![abc]} -> char classes / negated (configurable)
- *  - Quantifiers after tokens: {digit}{4}, {email}+ etc.
- *  - Optional "space expansion": literal spaces become \s+ (once per run)
+ * - Tokens like {digit}, {alpha}, {email}, {delim-ws}, {start}/{end}
+ * - Shorthands: # -> digit, % -> any (configurable)
+ * - Wrangle-style classes: {[abc]} and {![abc]} -> char classes / negated (configurable)
+ * - Quantifiers after tokens: {digit}{4}, {email}+ etc.
+ * - Optional "space expansion": literal spaces become \s+ (once per run)
  *
  * Nothing magical at runtime: this produces a normal Regex with chosen options.
  */
 object FriendlyRegex {
-
     // --- Public surface --------------------------------------------------------
 
     data class Definition(
         val pattern: String,
-        val validator: ((String) -> Boolean)? = null,   // kept for future extract/validate helpers
-        val description: String? = null
+        val validator: ((String) -> Boolean)? = null, // kept for future extract/validate helpers
+        val description: String? = null,
     )
 
     data class Config(
         val definitions: Map<String, Definition> = defaultDefinitions(),
-        val percentageIsAny: Boolean = true,           // % -> .
-        val hashIsDigit: Boolean = true,               // # -> \d
-        val supportWrangleStyleClasses: Boolean = true,// {[...]} and {![...]}
-        val expandSpaces: Boolean = true,              // runs of spaces -> \s+
+        val percentageIsAny: Boolean = true, // % -> .
+        val hashIsDigit: Boolean = true, // # -> \d
+        val supportWrangleStyleClasses: Boolean = true, // {[...]} and {![...]}
+        val expandSpaces: Boolean = true, // runs of spaces -> \s+
         val caseInsensitive: Boolean = false,
         val dotMatchesNewline: Boolean = false,
         val multiline: Boolean = false,
-        val wrapTokensInNonCapturingGroups: Boolean = true // (?:...) around token fragments
+        val wrapTokensInNonCapturingGroups: Boolean = true, // (?:...) around token fragments
     ) {
         /** Return a new Config with merged definitions (new ones win). */
         fun extend(newDefinitions: Map<String, Definition>): Config =
@@ -60,7 +61,6 @@ object FriendlyRegex {
     // --- Implementation --------------------------------------------------------
 
     private object Compiler {
-
         private val quantifierRe = Regex("^\\d+(?:,\\d*)?$") // {4}, {2,}, {2,5}
 
         fun compileToRegexString(src: String, cfg: Config): String {
@@ -81,16 +81,23 @@ object FriendlyRegex {
 
             fun copyCharClass() {
                 // Copy a [...] class verbatim until the matching ] (handles escaping).
-                out.append('['); i++ // consume '['
+                out.append('[')
+                i++ // consume '['
                 var closed = false
                 while (i < n) {
                     val c = src[i]
                     out.append(c)
                     i++
                     if (c == '\\') {
-                        if (i < n) { out.append(src[i]); i++ } else error("Dangling escape in character class")
+                        if (i < n) {
+                            out.append(src[i])
+                            i++
+                        } else {
+                            error("Dangling escape in character class")
+                        }
                     } else if (c == ']') {
-                        closed = true; break
+                        closed = true
+                        break
                     }
                 }
                 if (!closed) error("Unclosed character class '['")
@@ -115,7 +122,8 @@ object FriendlyRegex {
                             }
 
                             // Wrangle-style classes: {[...]} and {![...]}
-                            cfg.supportWrangleStyleClasses && (inside.startsWith("[") || inside.startsWith("![")) -> {
+                            cfg.supportWrangleStyleClasses &&
+                                (inside.startsWith("[") || inside.startsWith("![")) -> {
                                 val neg = inside.startsWith("![")
                                 val body = if (neg) inside.substring(2) else inside.substring(1)
                                 require(body.endsWith("]")) { "Bad class in {$inside}" }
@@ -125,12 +133,15 @@ object FriendlyRegex {
 
                             // Anchors
                             inside == "start" -> out.append('^')
-                            inside == "end"   -> out.append('$')
+                            inside == "end" -> out.append('$')
 
                             // Token lookup
                             else -> {
-                                val def = cfg.definitions[inside]
-                                    ?: throw IllegalArgumentException("Unknown token {$inside} in pattern: $src")
+                                val def =
+                                    cfg.definitions[inside]
+                                        ?: throw IllegalArgumentException(
+                                            "Unknown token {$inside} in pattern: $src"
+                                        )
                                 val frag = def.pattern
                                 if (cfg.wrapTokensInNonCapturingGroups && needsGrouping(frag)) {
                                     out.append("(?:").append(frag).append(")")
@@ -147,24 +158,49 @@ object FriendlyRegex {
                     // --- Escapes: pass through (lets you do \{ to mean a literal brace, etc.)
                     '\\' -> {
                         if (i + 1 >= n) error("Dangling backslash")
-                        out.append('\\').append(src[i + 1]); i += 2
+                        out.append('\\').append(src[i + 1])
+                        i += 2
                     }
 
                     // --- Shorthands
-                    '#' -> { out.append(if (cfg.hashIsDigit) "\\d" else "#"); i++ }
-                    '%' -> { out.append(if (cfg.percentageIsAny) "."  else "%"); i++ }
+                    '#' -> {
+                        out.append(if (cfg.hashIsDigit) "\\d" else "#")
+                        i++
+                    }
+                    '%' -> {
+                        out.append(if (cfg.percentageIsAny) "." else "%")
+                        i++
+                    }
 
                     // --- Space(s)
                     ' ' -> {
-                        if (cfg.expandSpaces) consumeSpaceRun()
-                        else { out.append(' '); i++ }
+                        if (cfg.expandSpaces) {
+                            consumeSpaceRun()
+                        } else {
+                            out.append(' ')
+                            i++
+                        }
                     }
 
                     // --- Pass-through regex operators that users might want explicitly
-                    '(', ')', '|', '.', '+', '*', '?', '^', '$' -> { out.append(ch); i++ }
+                    '(',
+                    ')',
+                    '|',
+                    '.',
+                    '+',
+                    '*',
+                    '?',
+                    '^',
+                    '$' -> {
+                        out.append(ch)
+                        i++
+                    }
 
                     // --- Default: escape to be literal
-                    else -> { out.append(Regex.escape(ch.toString())); i++ }
+                    else -> {
+                        out.append(Regex.escape(ch.toString()))
+                        i++
+                    }
                 }
             }
 
@@ -178,9 +214,19 @@ object FriendlyRegex {
             val first = frag.first()
             if (frag.length == 1 && first != '\\') return false
             if (first == '[' && frag.last() == ']') return false
-            if (frag.startsWith("(?:") || frag.startsWith("(?=") || frag.startsWith("(?<=") ||
-                frag.startsWith("(?!") || frag.startsWith("(?<!") || frag.startsWith("(?i:") ||
-                frag.startsWith("(?-i:") || frag.startsWith("(?s:") || frag.startsWith("(?-s:")) return false
+            if (
+                frag.startsWith("(?:") ||
+                    frag.startsWith("(?=") ||
+                    frag.startsWith("(?<=") ||
+                    frag.startsWith("(?!") ||
+                    frag.startsWith("(?<!") ||
+                    frag.startsWith("(?i:") ||
+                    frag.startsWith("(?-i:") ||
+                    frag.startsWith("(?s:") ||
+                    frag.startsWith("(?-s:")
+            ) {
+                return false
+            }
             return true
         }
     }
@@ -190,7 +236,7 @@ object FriendlyRegex {
     private fun defaultDefinitions(): Map<String, Definition> = buildMap {
         // Primitives
         put("digit", Definition("\\d", description = "0-9"))
-        put("any",   Definition(".", description = "any char once"))
+        put("any", Definition(".", description = "any char once"))
 
         put("alpha", Definition("[A-Za-z_]", description = "letters plus underscore"))
         put("upper", Definition("[A-Z_]", description = "uppercase letters plus underscore"))
@@ -198,24 +244,50 @@ object FriendlyRegex {
         put("alpha-numeric", Definition("[A-Za-z0-9]"))
 
         // Delimiters (common punctuation or whitespace)
-        put("delim",    Definition("[\\s:|/.,-]"))
+        put("delim", Definition("[\\s:|/.,-]"))
         put("delim-ws", Definition("\\s*[:|/.,-]\\s*"))
 
         // Types (conservative)
         put("email", Definition("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"))
-        put("url",   Definition("(?:https?://)?[A-Za-z0-9.-]+(?::\\d+)?(?:/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?"))
-        put("phone", Definition("(?:\\+1[\\s.-]?)?(?:\\(\\d{3}\\)|\\d{3})[\\s.-]?\\d{3}[\\s.-]?\\d{4}"))
-        put("ip-address", Definition("(?:(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)"))
-        put("bool",  Definition("(?i:true|false|t|f|yes|no|1|0)"))
+        put(
+            "url",
+            Definition(
+                "(?:https?://)?[A-Za-z0-9.-]+(?::\\d+)?(?:/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?"
+            ),
+        )
+        put(
+            "phone",
+            Definition("(?:\\+1[\\s.-]?)?(?:\\(\\d{3}\\)|\\d{3})[\\s.-]?\\d{3}[\\s.-]?\\d{4}"),
+        )
+        put(
+            "ip-address",
+            Definition(
+                "(?:(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)"
+            ),
+        )
+        put("bool", Definition("(?i:true|false|t|f|yes|no|1|0)"))
 
         // Date-ish helpers (composed with {yyyy}{delim}{MM}{delim}{dd}, etc.)
-        put("month", Definition("(?i:January|February|March|April|May|June|July|August|September|October|November|December)"))
+        put(
+            "month",
+            Definition(
+                "(?i:January|February|March|April|May|June|July|August|September|October|November|December)"
+            ),
+        )
         put("month-abbrev", Definition("(?i:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)"))
-        put("dayofweek", Definition("(?i:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)"))
+        put(
+            "dayofweek",
+            Definition("(?i:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)"),
+        )
         put("dayofweek-abbrev", Definition("(?i:Sun|Mon|Tue|Wed|Thu|Fri|Sat)"))
         put("utcoffset", Definition("(?:[+-]\\d{4}|Z)"))
 
         // You can obviously add more as you like (uuid, hex, etc.)
-        put("uuid", Definition("[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[1-5][A-Fa-f0-9]{3}-[89ABab][A-Fa-f0-9]{3}-[A-Fa-f0-9]{12}"))
+        put(
+            "uuid",
+            Definition(
+                "[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[1-5][A-Fa-f0-9]{3}-[89ABab][A-Fa-f0-9]{3}-[A-Fa-f0-9]{12}"
+            ),
+        )
     }
 }

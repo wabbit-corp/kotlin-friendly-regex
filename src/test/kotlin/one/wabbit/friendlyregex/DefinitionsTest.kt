@@ -1,10 +1,11 @@
 package one.wabbit.friendlyregex
 
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import one.wabbit.friendlyregex.FriendlyRegex as FR
 
 class DefinitionsTest {
-
     @Test
     fun email_token_is_conservative() {
         val r = FR.compile("{email}")

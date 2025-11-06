@@ -1,10 +1,12 @@
 package one.wabbit.friendlyregex
 
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import one.wabbit.friendlyregex.FriendlyRegex as FR
 
 class SpacesAndClassesTest {
-
     @Test
     fun expand_spaces_into_whitespace_runs() {
         val r = FR.compile("A  B  C") // two space runs
@@ -43,8 +45,6 @@ class SpacesAndClassesTest {
     @Test
     fun wrangle_style_classes_can_be_disabled() {
         val cfg = FR.defaultConfig.copy(supportWrangleStyleClasses = false)
-        assertFailsWith<IllegalArgumentException> {
-            FR.compile("HEX: {[A-F0-9]}{2}", cfg)
-        }
+        assertFailsWith<IllegalArgumentException> { FR.compile("HEX: {[A-F0-9]}{2}", cfg) }
     }
 }

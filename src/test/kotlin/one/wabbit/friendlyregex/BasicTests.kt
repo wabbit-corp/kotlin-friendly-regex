@@ -1,14 +1,20 @@
 package one.wabbit.friendlyregex
 
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import one.wabbit.friendlyregex.FriendlyRegex as FR
 
 class BasicsTest {
-
     @Test
     fun anchors_and_simple_tokens() {
-        val r = FR.compile("{start}{alpha}+@gmail.com{end}",
-            FR.defaultConfig.copy(caseInsensitive = true))
+        val r =
+            FR.compile(
+                "{start}{alpha}+@gmail.com{end}",
+                FR.defaultConfig.copy(caseInsensitive = true),
+            )
 
         assertTrue(r.matches("margo@gmail.com"))
         assertFalse(r.matches("X margo_9@gmail.com Y"))
