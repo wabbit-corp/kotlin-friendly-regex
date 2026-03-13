@@ -1,9 +1,5 @@
 package one.wabbit.friendlyregex
 
-import kotlin.text.RegexOption.DOT_MATCHES_ALL
-import kotlin.text.RegexOption.IGNORE_CASE
-import kotlin.text.RegexOption.MULTILINE
-
 /**
  * FriendlyRegex — a human-first pattern language that compiles to Kotlin Regex.
  *
@@ -47,11 +43,13 @@ object FriendlyRegex {
     /** Compile a FriendlyRegex pattern into a Kotlin Regex. */
     fun compile(pattern: String, config: Config = defaultConfig): Regex {
         val rx = toRegexString(pattern, config)
-        val opts = mutableSetOf<RegexOption>()
-        if (config.caseInsensitive) opts += IGNORE_CASE
-        if (config.dotMatchesNewline) opts += DOT_MATCHES_ALL
-        if (config.multiline) opts += MULTILINE
-        return Regex(rx, opts)
+        val flags =
+            buildString {
+                if (config.caseInsensitive) append('i')
+                if (config.dotMatchesNewline) append('s')
+                if (config.multiline) append('m')
+            }
+        return if (flags.isEmpty()) Regex(rx) else Regex("(?$flags)$rx")
     }
 
     // Optional but handy for debugging.
