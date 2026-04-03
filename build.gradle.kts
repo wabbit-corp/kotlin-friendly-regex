@@ -11,12 +11,14 @@ repositories {
 }
 
 group = "one.wabbit"
-version = "1.1.0"
+version = "1.0.0"
 
 plugins {
     id("com.android.kotlin.multiplatform.library")
 
     kotlin("multiplatform")
+
+    id("one.wabbit.acyclic")
 
     id("org.jetbrains.dokka")
     id("org.jetbrains.kotlinx.kover")
@@ -26,7 +28,7 @@ plugins {
 }
 
 mavenPublishing {
-    coordinates("one.wabbit", "kotlin-friendly-regex", "1.1.0")
+    coordinates("one.wabbit", "kotlin-friendly-regex", "1.0.0")
     publishToMavenCentral()
     signAllPublications()
     pom {
@@ -70,6 +72,16 @@ kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")
 
+        freeCompilerArgs.addAll(
+            "-P",
+            "plugin:one.wabbit.acyclic:compilationUnits=enabled",
+        )
+
+        freeCompilerArgs.addAll(
+            "-P",
+            "plugin:one.wabbit.acyclic:declarations=enabled",
+        )
+
     }
     applyDefaultHierarchyTemplate()
 
@@ -94,8 +106,16 @@ kotlin {
 
     macosArm64("hostNative")
 
-    targets.withType(KotlinNativeTarget::class.java).configureEach {
-        binaries.framework {
+    listOf(
+
+        targets.getByName("iosArm64"),
+
+        targets.getByName("iosSimulatorArm64"),
+
+        targets.getByName("hostNative"),
+
+    ).forEach { target ->
+        (target as KotlinNativeTarget).binaries.framework {
             baseName = "FriendlyRegex"
             isStatic = true
         }
